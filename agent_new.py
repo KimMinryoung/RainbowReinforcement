@@ -16,10 +16,15 @@ class Agent():
     self.n = args.multi_step
     self.discount = args.discount
     self.norm_clip = args.norm_clip
+    
+    self.sess = tf.Session()
+    self.saver = tf.train.Saver()
 
     self.online_net = DQN(args, self.action_space).to(device=args.device)
-    if args.model and os.path.isfile(args.model):
-      self.online_net.load_state_dict(torch.load(args.model, map_location='cpu'))
+    
+    self.saver.restore(self.sess, "./models/model.ckpt")
+    #if args.model and os.path.isfile(args.model):
+    #  self.online_net.load_state_dict(torch.load(args.model, map_location='cpu'))
     self.online_net.train()
 
     self.target_net = DQN(args, self.action_space).to(device=args.device)
@@ -31,8 +36,6 @@ class Agent():
     self.optimizer = tf.train.AdamOptimizer(learning_rate = args.lr, epsilon = args.adam_eps)
     #self.train_ = self.optimizer(self.online_net.parameters())
     #minimize(self.)
-    
-    self.sess = tf.Session()
 
   # Resets noisy weights in all linear layers (of online net only)
   def reset_noise(self):
@@ -67,7 +70,7 @@ class Agent():
     Tz = Tz.clamp(min=self.Vmin, max=self.Vmax)  # Clamp between supported values
     # Compute L2 projection of Tz onto fixed support z
     b = (Tz - self.Vmin) / self.delta_z  # b = (Tz - Vmin) / Δz
-    l, u = b.floor().to(torch.int64), b.ceil().to(torch.int64)
+    l, u = tf.cast(b.floor(), tf.int64), tf.cast(b.ceil(), tf.int64)
     # Fix disappearing probability mass when l = b = u (b is int)
     l[(u > 0) * (l == u)] -= 1
     u[(l < (self.atoms - 1)) * (l == u)] += 1
@@ -78,7 +81,7 @@ class Agent():
     m.view(-1).index_add_(0, (l + offset).view(-1), (pns_a * (u.float() - b)).view(-1))  # m_l = m_l + p(s_t+n, a*)(u - b)
     m.view(-1).index_add_(0, (u + offset).view(-1), (pns_a * (b - l.float())).view(-1))  # m_u = m_u + p(s_t+n, a*)(b - l)
 
-    loss = -torch.sum(m * log_ps_a, 1)  # Cross-entropy loss (minimises DKL(m||p(s_t, a_t)))
+    loss = -np.sum(m * log_ps_a, 1)  # Cross-entropy loss (minimises DKL(m||p(s_t, a_t)))
     loss = weights * loss  # Importance weight losses before prioritised experience replay (done after for original/non-distributional version)
     self.online_net.zero_grad()
     loss.mean().backward()  # Backpropagate minibatch loss
@@ -86,7 +89,8 @@ class Agent():
     train = self.optimizer.minimize(loss)
     self.sess.run(train)
     
-    nn.utils.clip_grad_norm_(self.online_net.parameters(), self.norm_clip)  # Clip gradients by L2 norm
+    tf.clip_by_norm(self.online_net.parameters, self.norm_clip)  # Clip gradients by L2 norm
+    #nn.utils.clip_grad_norm_(self.online_net.parameters(), self.norm_clip)
 
     mem.update_priorities(idxs, loss.detach())  # Update priorities of sampled transitions
 
@@ -95,7 +99,8 @@ class Agent():
 
   # Save model parameters on current device (don't move model between devices)
   def save(self, path):
-    torch.save(self.online_net.state_dict(), os.path.join(path, 'model.pth'))
+    self.save_path = self.saver.save(self.sess, "./models/model.ckpt")
+    #torch.save(self.online_net.state_dict(), os.path.join(path, 'model.pth'))
 
   # Evaluates Q-value based on single state (no batch)
   def evaluate_q(self, state):
