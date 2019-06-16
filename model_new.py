@@ -1,12 +1,11 @@
 import math
 import tensorflow as tf
-import torch
-
+import numpy as np
 
 class NoisyLinear():
-    def __init__(self,in_,out_,std_init=0.5,training):
+    def __init__(self,in_,out_,std_init=0.5,training = True):
         self.in_ = in_
-        self.out = out_
+        self.out_ = out_
         self.std_init = std_init
         self.weight_mu = tf.Variable(tf.zeros[out_,in_],name="weight_mu")
         self.weight_sigma = tf.Variable(tf.zeros[out_,in_],name="weight_sigma")
@@ -30,14 +29,14 @@ class NoisyLinear():
         self.weight_sigma = tf.fill([self.out_],self.std_init / math.sqrt(self.in_))
 
     def _scale_noise(self,size):
-        x = torch.rand(size)
+        x = np.random.rand(size)
         return x.sign().mul_(x.abs().sqrt_())
 
     def reset_noise(self):
         epsilon_in = self._scale_noise(self.in_)
         epsilon_out = self._scale_noise(self.out_)
 
-        self.weight_epsilon = tf.Varaible(tf.tensordot(epsilon_out,epsilon_in))
+        self.weight_epsilon = tf.Variable(tf.tensordot(epsilon_out,epsilon_in))
         self.bias_epsilon = tf.Variable(epsilon_out)
 
     def forward(self,input):
@@ -45,12 +44,12 @@ class NoisyLinear():
         self.result = tf.nn.conv2d(self.x,self.weight_mu) + self.bias_mu
         self.tr_result = tf.nn.conv2d(self.x,self.weight_mu+self.weight_sigma*self.weight_epsilon) + self.bias_mu + self.bias_sigma*self.bias_epsilon
 
-            if self.training:
-                self.sess.run(self.tr_result,feed_dict={self.x:input})
-                return self.tr_result
-            else:
-                self.sess.run(self.result,feed_dict={self.x:input})
-                return self.result
+        if self.training:
+            self.sess.run(self.tr_result,feed_dict={self.x:input})
+            return self.tr_result
+        else:
+            self.sess.run(self.result,feed_dict={self.x:input})
+            return self.result
 
 
 

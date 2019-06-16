@@ -43,6 +43,10 @@ class Agent():
 
   # Acts based on single state (no batch)
   def act(self, state):
+    Qs = sess.run(self.online_net.forward(state.unsqueeze(0)), feed_dict = {DQN.inputs_: state.reshape((1, *state.shape))})
+    choice = np.argmax(Qs)
+    # ????
+    
     return (self.online_net(state.unsqueeze(0)) * self.support).sum(2).argmax(1).item()
 
   # Acts with an ε-greedy policy (used for evaluation only)
