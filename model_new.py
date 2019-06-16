@@ -4,7 +4,7 @@ import torch
 
 
 class NoisyLinear():
-    def __init__(self,in_,out_,std_init=0.5):
+    def __init__(self,in_,out_,std_init=0.5,training):
         self.in_ = in_
         self.out = out_
         self.std_init = std_init
@@ -16,6 +16,8 @@ class NoisyLinear():
 
         self.sess = tf.InteractiveSession()
         self.sess.run(tf.initialize_all_variables())
+
+        self.training = training
 
 
 
@@ -41,9 +43,14 @@ class NoisyLinear():
     def forward(self,input):
         self.x = tf.placeholder(tf.float32, [None, self.in_], name="x")
         self.result = tf.nn.conv2d(self.x,self.weight_mu) + self.bias_mu
+        self.tr_result = tf.nn.conv2d(self.x,self.weight_mu+self.weight_sigma*self.weight_epsilon) + self.bias_mu + self.bias_sigma*self.bias_epsilon
 
-            self.sess.run(self.result,feed_dict={self.x:input})
-            return self.result
+            if self.training:
+                self.sess.run(self.tr_result,feed_dict={self.x:input})
+                return self.tr_result
+            else:
+                self.sess.run(self.result,feed_dict={self.x:input})
+                return self.result
 
 
 
