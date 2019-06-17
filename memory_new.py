@@ -5,7 +5,7 @@ import tensorflow as tf
 
 
 Transition = namedtuple('Transition', ('timestep', 'state', 'action', 'reward', 'nonterminal'))
-blank_trans = Transition(0, tf.zeros(84, 84, dtype=tf.uint8), None, 0, False)
+blank_trans = Transition(0, tf.zeros([84, 84], dtype=tf.uint8), None, 0, False)
 
 
 # Segment tree data structure where parent node values are sum/max of children node values
