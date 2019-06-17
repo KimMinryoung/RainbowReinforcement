@@ -2,7 +2,7 @@ import os
 import random
 import tensorflow as tf
 import numpy as np
-from model import DQN
+from model_new import DQN
 
 class Agent():
   def __init__(self, args, env):
@@ -27,15 +27,14 @@ class Agent():
     #  self.online_net.load_state_dict(torch.load(args.model, map_location='cpu'))
     self.online_net.train()
 
-    self.target_net = DQN(args, self.action_space).to(device=args.device)
+    #self.target_net = DQN(args, self.action_space).to(device=args.device)
+    self.target_net = DQN(args, self.action_space)
     self.update_target_net()
     self.target_net.train()
-    for param in self.target_net.parameters():
-      param.requires_grad = False
+    #for param in self.target_net.parameters():
+    #  param.requires_grad = False
 
     self.optimizer = tf.train.AdamOptimizer(learning_rate = args.lr, epsilon = args.adam_eps)
-    #self.train_ = self.optimizer(self.online_net.parameters())
-    #minimize(self.)
 
   # Resets noisy weights in all linear layers (of online net only)
   def reset_noise(self):
@@ -43,10 +42,6 @@ class Agent():
 
   # Acts based on single state (no batch)
   def act(self, state):
-    Qs = sess.run(self.online_net.forward(state.unsqueeze(0)), feed_dict = {DQN.inputs_: state.reshape((1, *state.shape))})
-    choice = np.argmax(Qs)
-    # ????
-    
     return (self.online_net(state.unsqueeze(0)) * self.support).sum(2).argmax(1).item()
 
   # Acts with an ε-greedy policy (used for evaluation only)
