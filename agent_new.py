@@ -20,7 +20,8 @@ class Agent():
     self.sess = tf.Session()
     self.saver = tf.train.Saver()
 
-    self.online_net = DQN(args, self.action_space).to(device=args.device)
+    #self.online_net = DQN(args, self.action_space).to(device=args.device)
+    self.online_net = DQN(args, self.action_space)
     
     self.saver.restore(self.sess, "./models/model.ckpt")
     #if args.model and os.path.isfile(args.model):
@@ -42,7 +43,7 @@ class Agent():
 
   # Acts based on single state (no batch)
   def act(self, state):
-    return (self.online_net(state.unsqueeze(0)) * self.support).sum(2).argmax(1).item()
+    return (self.online_net.forward(state.unsqueeze(0)) * self.support).sum(2).argmax(1).item()
 
   # Acts with an ε-greedy policy (used for evaluation only)
   def act_e_greedy(self, state, epsilon=0.001):  # High ε can reduce evaluation scores drastically
@@ -53,15 +54,15 @@ class Agent():
     idxs, states, actions, returns, next_states, nonterminals, weights = mem.sample(self.batch_size)
 
     # Calculate current state probabilities (online network noise already sampled)
-    log_ps = self.online_net(states, log=True)  # Log probabilities log p(s_t, ·; θonline)
+    log_ps = self.online_net.forward(states, log=True)  # Log probabilities log p(s_t, ·; θonline)
     log_ps_a = log_ps[range(self.batch_size), actions]  # log p(s_t, a_t; θonline)
 
     # Calculate nth next state probabilities
-    pns = self.online_net(next_states)  # Probabilities p(s_t+n, ·; θonline)
+    pns = self.online_net.forward(next_states)  # Probabilities p(s_t+n, ·; θonline)
     dns = self.support.expand_as(pns) * pns  # Distribution d_t+n = (z, p(s_t+n, ·; θonline))
     argmax_indices_ns = dns.sum(2).argmax(1)  # Perform argmax action selection using online network: argmax_a[(z, p(s_t+n, a; θonline))]
     self.target_net.reset_noise()  # Sample new target net noise
-    pns = self.target_net(next_states)  # Probabilities p(s_t+n, ·; θtarget)
+    pns = self.target_net.forward(next_states)  # Probabilities p(s_t+n, ·; θtarget)
     pns_a = pns[range(self.batch_size), argmax_indices_ns]  # Double-Q probabilities p(s_t+n, argmax_a[(z, p(s_t+n, a; θonline))]; θtarget)
 
     # Compute Tz (Bellman operator T applied to z)
@@ -82,19 +83,34 @@ class Agent():
 
     loss = -np.sum(m * log_ps_a, 1)  # Cross-entropy loss (minimises DKL(m||p(s_t, a_t)))
     loss = weights * loss  # Importance weight losses before prioritised experience replay (done after for original/non-distributional version)
-    self.online_net.zero_grad()
-    loss.mean().backward()  # Backpropagate minibatch loss
+    
+    #self.online_net.zero_grad()
+    #loss.mean().backward()  # Backpropagate minibatch loss
     #self.optimizer.step()
-    train = self.optimizer.minimize(loss)
+    
+    tvars = tf.trainable_variables()
+    grads, _ = tf.clip_by_norm(tvars, self.norm_clip)
+    train = self.optimizer.apply_gradients(zip(grads, tvars))
+    
+    #train = self.optimizer.minimize(loss)
     self.sess.run(train)
     
-    tf.clip_by_norm(self.online_net.parameters, self.norm_clip)  # Clip gradients by L2 norm
+    #tf.clip_by_norm(self.online_net.parameters(), self.norm_clip)  # Clip gradients by L2 norm
     #nn.utils.clip_grad_norm_(self.online_net.parameters(), self.norm_clip)
 
     mem.update_priorities(idxs, loss.detach())  # Update priorities of sampled transitions
 
-  def update_target_net(self):
-    self.target_net.load_state_dict(self.online_net.state_dict())
+  def update_target_net(self): # ?!?!?!?!?!?!?!
+    e1_params = [t for t in tf.trainable_variables() if t.name.startswith(estimator1.scope)]
+    e1_params = sorted(e1_params, key=lambda v: v.name)
+    e2_params = [t for t in tf.trainable_variables() if t.name.startswith(estimator2.scope)]
+    e2_params = sorted(e2_params, key=lambda v: v.name)
+    update_ops = []
+    for e1_v, e2_v in zip(e1_params, e2_params):
+      op = e2_v.assign(e1_v)
+      update_ops.append(op)
+    sess.run(update_ops)
+    #self.target_net.load_state_dict(self.online_net.state_dict())
 
   # Save model parameters on current device (don't move model between devices)
   def save(self, path):
@@ -103,7 +119,7 @@ class Agent():
 
   # Evaluates Q-value based on single state (no batch)
   def evaluate_q(self, state):
-    return (self.online_net(state.unsqueeze(0)) * self.support).sum(2).max(1)[0].item()
+    return (self.online_net.forward(state.unsqueeze(0)) * self.support).sum(2).max(1)[0].item()
 
   def train(self):
     self.online_net.train()

@@ -98,6 +98,12 @@ class DQN():
         self.fc_h_a.training = True
         self.fc_z_v.training = True
         self.fc_z_a.training = True
+        
+    def eval(self):
+        self.fc_h_v.training = False
+        self.fc_h_a.training = False
+        self.fc_z_v.training = False
+        self.fc_z_a.training = False
 
     def forward(self, inputs, log=False):
         if log:
