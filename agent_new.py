@@ -21,7 +21,8 @@ class Agent():
     self.saver = tf.train.Saver()
 
     #self.online_net = DQN(args, self.action_space).to(device=args.device)
-    self.online_net = DQN(args, self.action_space)
+    with tf.variable_scope("online_net"):
+      self.online_net = DQN(args, self.action_space)
     
     self.saver.restore(self.sess, "./models/model.ckpt")
     #if args.model and os.path.isfile(args.model):
@@ -29,11 +30,21 @@ class Agent():
     self.online_net.train()
 
     #self.target_net = DQN(args, self.action_space).to(device=args.device)
-    self.target_net = DQN(args, self.action_space)
+    with tf.variable_scope("target_net"):
+      self.target_net = DQN(args, self.action_space)
     self.update_target_net()
     self.target_net.train()
     #for param in self.target_net.parameters():
     #  param.requires_grad = False
+    
+    # make an op for target update
+    online_net_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="online_net")
+    target_net_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="target_net")
+    update_target_op = []
+    for var, var_target in zip(sorted(online_net_func_vars, key=lambda v: v.name),
+                               sorted(target_net_func_vars, key=lambda v: v.name)):
+        update_target_op.append(var_target.assign(var))
+    self.update_target_op = tf.group(*update_target_op)
 
     self.optimizer = tf.train.AdamOptimizer(learning_rate = args.lr, epsilon = args.adam_eps)
 
@@ -101,7 +112,9 @@ class Agent():
     mem.update_priorities(idxs, loss.detach())  # Update priorities of sampled transitions
 
   def update_target_net(self): # ?!?!?!?!?!?!?!
-    e1_params = [t for t in tf.trainable_variables() if t.name.startswith(estimator1.scope)]
+    self.sess.run(self.update_target_op)
+    
+    '''e1_params = [t for t in tf.trainable_variables() if t.name.startswith(estimator1.scope)]
     e1_params = sorted(e1_params, key=lambda v: v.name)
     e2_params = [t for t in tf.trainable_variables() if t.name.startswith(estimator2.scope)]
     e2_params = sorted(e2_params, key=lambda v: v.name)
@@ -109,7 +122,8 @@ class Agent():
     for e1_v, e2_v in zip(e1_params, e2_params):
       op = e2_v.assign(e1_v)
       update_ops.append(op)
-    sess.run(update_ops)
+    sess.run(update_ops)'''
+    
     #self.target_net.load_state_dict(self.online_net.state_dict())
 
   # Save model parameters on current device (don't move model between devices)
