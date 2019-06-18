@@ -20,8 +20,8 @@ class NoisyLinear():
 
         self.bias_epsilon = tf.constant
 
-        self.result = tf.nn.conv2d(self.input, self.weight_mu) + self.bias_mu
-        self.tr_result = tf.nn.conv2d(self.input,
+        self.result = tf.matmul(self.input, self.weight_mu) + self.bias_mu
+        self.tr_result = tf.matmul(self.input,
                                       self.weight_mu + self.weight_sigma * self.weight_epsilon) + self.bias_mu + self.bias_sigma * self.bias_epsilon
 
         self.sess = tf.InteractiveSession()
