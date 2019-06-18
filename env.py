@@ -1,7 +1,7 @@
 from collections import deque
 import random
 import atari_py
-import torch
+import tensorflow as tf
 import cv2  # Note that importing cv2 before torch may cause segfaults?
 
 
@@ -25,11 +25,11 @@ class Env():
 
   def _get_state(self):
     state = cv2.resize(self.ale.getScreenGrayscale(), (84, 84), interpolation=cv2.INTER_LINEAR)
-    return torch.tensor(state, dtype=torch.float32, device=self.device).div_(255)
+    return tf.tensor(state, dtype=tf.float32, device=self.device).div_(255) #torch -> tf
 
   def _reset_buffer(self):
     for _ in range(self.window):
-      self.state_buffer.append(torch.zeros(84, 84, device=self.device))
+      self.state_buffer.append(tf.zeros([84, 84], device=self.device)) #torch -> tf
 
   def reset(self):
     if self.life_termination:
@@ -48,11 +48,11 @@ class Env():
     observation = self._get_state()
     self.state_buffer.append(observation)
     self.lives = self.ale.lives()
-    return torch.stack(list(self.state_buffer), 0)
+    return tf.stack(list(self.state_buffer), 0) #torch -> tf
 
   def step(self, action):
     # Repeat action 4 times, max pool over last 2 frames
-    frame_buffer = torch.zeros(2, 84, 84, device=self.device)
+    frame_buffer = tf.zeros([2, 84, 84], device=self.device) #torch -> tf
     reward, done = 0, False
     for t in range(4):
       reward += self.ale.act(self.actions.get(action))
@@ -70,10 +70,10 @@ class Env():
       lives = self.ale.lives()
       if lives < self.lives and lives > 0:  # Lives > 0 for Q*bert
         self.life_termination = not done  # Only set flag when not truly done
-        done = True
+        done = True 
       self.lives = lives
     # Return state, reward, done
-    return torch.stack(list(self.state_buffer), 0), reward, done
+    return tf.stack(list(self.state_buffer), 0), reward, done #torch -> tf
 
   # Uses loss of life as terminal signal
   def train(self):
