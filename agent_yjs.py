@@ -9,7 +9,7 @@ class Agent():
     self.atoms = args.atoms
     self.Vmin = args.V_min
     self.Vmax = args.V_max
-    self.support = tf.linspace(args.V_min, args.V_max, self.atoms)  # Support (range) of z
+    self.support = np.linspace(args.V_min, args.V_max, self.atoms)  # Support (range) of z
     self.delta_z = (args.V_max - args.V_min) / (self.atoms - 1)
     self.batch_size = args.batch_size
     self.n = args.multi_steps
@@ -75,7 +75,7 @@ class Agent():
   def act(self, state):
     #return (self.forward(self.online_net, state.unsqueeze(0)) * self.support).sum(2).argmax(1).item()
     #print(np.argmax(tf.math.reduce_sum((self.forward(self.online_net, state.reshape(1,84,84,4)) * self.support), axis=2)))
-    return np.argmax(tf.math.reduce_sum((self.forward(self.online_net, state.reshape(1,84,84,4)) * self.support), axis=2))
+    return np.argmax(np.sum((self.forward(self.online_net, state.reshape(1,84,84,4)) * self.support), axis=-1))
 
   # Acts with an ε-greedy policy (used for evaluation only)
   def act_e_greedy(self, state, epsilon=0.001):  # High ε can reduce evaluation scores drastically
@@ -89,15 +89,22 @@ class Agent():
     log_ps = self.forward(self.online_net, states, log=True)  # Log probabilities log p(s_t, ·; θonline)
     print("log_ps.shape: " + str(log_ps.shape))
     print("actions.shape: " + str(actions.shape))
-    log_ps_a = np.ndarray([self.batch_size, self.atoms],dtype=np.float32)
+    #log_ps_a = [np.ndarray([self.batch_size, self.atoms],dtype=np.float32)]
+    log_ps_a = []
     for i in range(self.batch_size):
-      log_ps_a[i] = log_ps[i][actions[i]]
+      log_ps_a.append(log_ps[i][actions[i]])
+      #log_ps_a[i] = log_ps[i][actions[i]]
     #log_ps_a = log_ps[0:, actions]  # log p(s_t, a_t; θonline)
 
     # Calculate nth next state probabilities
     pns = self.forward(self.online_net, next_states)  # Probabilities p(s_t+n, ·; θonline)
-    dns = self.support.expand_as(pns) * pns  # Distribution d_t+n = (z, p(s_t+n, ·; θonline))
-    argmax_indices_ns = dns.sum(2).argmax(1)  # Perform argmax action selection using online network: argmax_a[(z, p(s_t+n, a; θonline))]
+    print("pns shape : " + str(pns.shape))
+    #dns = self.support.expand_as(pns) * pns  # Distribution d_t+n = (z, p(s_t+n, ·; θonline))
+    dns = np.broadcast_to(pns, [self.action_space, self.atoms])
+    dns = np.broadcast_to(dns, [self.batch_size, self.action_space, self.atoms])
+    print("dns shape : " + str(dns.shape))
+    argmax_indices_ns = np.argmax(np.sum(dns, axis=-1), axis=1)
+    #sum(2).argmax(1)  # Perform argmax action selection using online network: argmax_a[(z, p(s_t+n, a; θonline))]
     self.target_net.reset_noise()  # Sample new target net noise
     pns = self.forward(self.target_net, next_states)  # Probabilities p(s_t+n, ·; θtarget)
     pns_a = pns[range(self.batch_size), argmax_indices_ns]  # Double-Q probabilities p(s_t+n, argmax_a[(z, p(s_t+n, a; θonline))]; θtarget)

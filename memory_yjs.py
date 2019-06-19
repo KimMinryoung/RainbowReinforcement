@@ -6,7 +6,7 @@ import numpy as np
 
 Transition = namedtuple('Transition', ('timestep', 'state', 'action', 'reward', 'nonterminal'))
 # torch -> tf
-blank_trans = Transition(0, tf.zeros([84, 84], dtype=tf.uint8), None, 0, False)
+blank_trans = Transition(0, np.zeros([84, 84], dtype=np.uint8), None, 0, False)
 
 
 # Segment tree data structure where parent node values are sum/max of children node values
@@ -135,7 +135,7 @@ class ReplayMemory():
     states, next_states, = np.stack(states), np.stack(next_states)
     actions, returns, nonterminals = np.concatenate(actions), np.concatenate(returns), np.stack(nonterminals)
     #probs = tf.tensor(probs, dtype=tf.float32, device=self.device) / p_total  # Calculate normalised probabilities
-    probs = np.asarray(probs, dtype=np.float32)
+    probs = np.divide(np.asarray(probs, dtype=np.float32),p_total)
     capacity = self.capacity if self.transitions.full else self.transitions.index
     weights = (capacity * probs) ** -self.priority_weight  # Compute importance-sampling weights w
     weights = weights / weights.max()   # Normalise by max importance-sampling weight from batch
