@@ -31,8 +31,8 @@ class NoisyLinear():
     def reset_variables(self):
         mu_range = 1 / math.sqrt(self.in_)
 
-        self.weight_mu = tf.random_uniform([self.out_, self.in_], minval=-mu_range, maxval=mu_range, dtype=tf.float32)
-        self.weight_sigma = tf.fill([self.out_, self.in_], self.std_init / math.sqrt(self.in_))
+        self.weight_mu = tf.random_uniform([self.in_, self.out_], minval=-mu_range, maxval=mu_range, dtype=tf.float32)
+        self.weight_sigma = tf.fill([self.in_, self.out_], self.std_init / math.sqrt(self.in_))
 
         self.bias_mu = tf.random_uniform([self.out_], minval=-mu_range, maxval=mu_range, dtype=tf.float32)
         self.weight_sigma = tf.fill([self.out_], self.std_init / math.sqrt(self.in_))
@@ -88,13 +88,18 @@ class DQN():
         self.h_fc_h_a = tf.nn.relu(self.r_a)
         
         self.fc_z_v = NoisyLinear(self.h_fc_h_v, args.hidden_size, self.atoms, std_init=args.init_noisy_std)
-        self.z_v = self.fc_h_v.tr_result
+        self.z_v = self.fc_z_v.tr_result
         self.fc_z_a = NoisyLinear(self.h_fc_h_a, args.hidden_size, action_space * self.atoms, std_init=args.init_noisy_std)
-        self.z_a = self.fc_h_v.tr_result
+        self.z_a = self.fc_z_a.tr_result
         self.h_fc_z_v = tf.nn.relu(self.z_v)
         self.h_fc_z_a = tf.nn.relu(self.z_a)
+        
+        self.v = tf.reshape(self.h_fc_z_v,[-1,1,self.atoms])
+        self.a = tf.reshape(self.h_fc_z_a,[-1,self.action_space,self.atoms])
+        
 
-        self.q = self.h_fc_h_v + self.h_fc_h_v - tf.reduce_mean(self.h_fc_h_v, axis=1, keep_dims=True)
+        #self.q = self.h_fc_h_v + self.h_fc_h_v - tf.reduce_mean(self.h_fc_h_v, axis=1, keep_dims=True)
+        self.q = self.v + self.a - tf.reduce_mean(self.a,axis=1,keep_dims=True)
         self.action = tf.nn.softmax(self.q)
         self.action_log = tf.nn.log_softmax(self.q)
 

@@ -2,6 +2,7 @@ from collections import deque
 import random
 import atari_py
 import tensorflow as tf
+import numpy as np
 import cv2  # Note that importing cv2 before torch may cause segfaults?
 
 
@@ -25,11 +26,14 @@ class Env():
 
   def _get_state(self):
     state = cv2.resize(self.ale.getScreenGrayscale(), (84, 84), interpolation=cv2.INTER_LINEAR)
-    return tf.tensor(state, dtype=tf.float32, device=self.device).div_(255) #torch -> tf
+    state = state.astype(np.float32)
+    return np.divide(state,255) #torch -> tf
+    # cv image - ndarray
 
   def _reset_buffer(self):
     for _ in range(self.window):
-      self.state_buffer.append(tf.zeros([84, 84], device=self.device)) #torch -> tf
+      #self.state_buffer.append(tf.zeros([84, 84])) #torch -> tf
+      self.state_buffer.append(np.zeros((84,84),dtype=np.float32))
 
   def reset(self):
     if self.life_termination:
@@ -48,11 +52,13 @@ class Env():
     observation = self._get_state()
     self.state_buffer.append(observation)
     self.lives = self.ale.lives()
-    return tf.stack(list(self.state_buffer), 0) #torch -> tf
+    #return tf.stack(list(self.state_buffer), 0) #torch -> tf
+    return np.stack(list(self.state_buffer),0)
 
   def step(self, action):
     # Repeat action 4 times, max pool over last 2 frames
-    frame_buffer = tf.zeros([2, 84, 84], device=self.device) #torch -> tf
+    #frame_buffer = tf.zeros([2, 84, 84]) #torch -> tf
+    frame_buffer = np.zeros((2,84,84),dtype=np.float32)
     reward, done = 0, False
     for t in range(4):
       reward += self.ale.act(self.actions.get(action))
@@ -63,7 +69,7 @@ class Env():
       done = self.ale.game_over()
       if done:
         break
-    observation = frame_buffer.max(0)[0]
+    observation = frame_buffer.max(0)
     self.state_buffer.append(observation)
     # Detect loss of life as terminal in training mode
     if self.training:
@@ -73,7 +79,7 @@ class Env():
         done = True 
       self.lives = lives
     # Return state, reward, done
-    return tf.stack(list(self.state_buffer), 0), reward, done #torch -> tf
+    return np.stack(list(self.state_buffer), 0), reward, done #torch -> tf
 
   # Uses loss of life as terminal signal
   def train(self):

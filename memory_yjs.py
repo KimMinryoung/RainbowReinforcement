@@ -1,6 +1,7 @@
 import random
 from collections import namedtuple
 import tensorflow as tf # use tensorflow instead of torch
+import numpy as np
 
 
 Transition = namedtuple('Transition', ('timestep', 'state', 'action', 'reward', 'nonterminal'))
@@ -76,7 +77,8 @@ class ReplayMemory():
 
   # Adds state and action at time t, reward and terminal at time t + 1
   def append(self, state, action, reward, terminal):
-    state = state[-1].mul(255).to(dtype=tf.uint8, device=tf.device("/cpu:0"))  # Only store last frame and discretise to save memory
+    #state = state[-1].mul(255).to(dtype=tf.uint8, device=tf.device("/cpu:0"))  # Only store last frame and discretise to save memory
+    state = np.multiply(state[-1],255)
     self.transitions.append(Transition(self.t, state, action, reward, not terminal), self.transitions.max)  # Store new transition with maximum priority
     self.t = 0 if terminal else self.t + 1  # Start new episodes with t = 0
 
