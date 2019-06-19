@@ -6,7 +6,7 @@ import tensorflow as tf #use tensorflow instead of torch
 
 Transition = namedtuple('Transition', ('timestep', 'state', 'action', 'reward', 'nonterminal'))
 #torch -> tf
-blank_trans = Transition(0, tf.zeros([84, 84], dtype=tf.uint8), None, 0, False) #torch -> tf
+blank_trans = Transition(0, tf.zeros([84, 84], dtype=tf.uint8), None, 0, False)
 
 
 # Segment tree data structure where parent node values are sum/max of children node values
@@ -110,14 +110,14 @@ class ReplayMemory():
     # Retrieve all required transition data (from t - h to t + n)
     transition = self._get_transition(idx)
     # Create un-discretised state and nth next state
-    state = tf.stack([trans.state for trans in transition[:self.history]]).to(dtype=tf.float32, device=self.device).div_(255) #torch -> tf
-    next_state = tf.stack([trans.state for trans in transition[self.n:self.n + self.history]]).to(dtype=tf.float32, device=self.device).div_(255) #torch -> tf
+    state = tf.stack([trans.state for trans in transition[:self.history]]).to(dtype=tf.float32, device=self.device).div_(255)
+    next_state = tf.stack([trans.state for trans in transition[self.n:self.n + self.history]]).to(dtype=tf.float32, device=self.device).div_(255)
     # Discrete action to be used as index
-    action = tf.tensor([transition[self.history - 1].action], dtype=tf.int64, device=self.device) #torch -> tf
+    action = tf.tensor([transition[self.history - 1].action], dtype=tf.int64, device=self.device)
     # Calculate truncated n-step discounted return R^n = Σ_k=0->n-1 (γ^k)R_t+k+1 (note that invalid nth next states have reward 0)
-    R = tf.tensor([sum(self.discount ** n * transition[self.history + n - 1].reward for n in range(self.n))], dtype=tf.float32, device=self.device) #torch -> tf
+    R = tf.tensor([sum(self.discount ** n * transition[self.history + n - 1].reward for n in range(self.n))], dtype=tf.float32, device=self.device)
     # Mask for non-terminal nth next states
-    nonterminal = tf.tensor([transition[self.history + self.n - 1].nonterminal], dtype=tf.float32, device=self.device) #torch -> tf
+    nonterminal = tf.tensor([transition[self.history + self.n - 1].nonterminal], dtype=tf.float32, device=self.device)
 
     return prob, idx, tree_idx, state, action, R, next_state, nonterminal
 
@@ -126,9 +126,9 @@ class ReplayMemory():
     segment = p_total / batch_size  # Batch size number of segments, based on sum over all probabilities
     batch = [self._get_sample_from_segment(segment, i) for i in range(batch_size)]  # Get batch of valid samples
     probs, idxs, tree_idxs, states, actions, returns, next_states, nonterminals = zip(*batch)
-    states, next_states, = tf.stack(states), tf.stack(next_states) #torch -> tf
-    actions, returns, nonterminals = tf.concat(actions), tf.concat(returns), tf.stack(nonterminals) #torch -> tf
-    probs = tf.tensor(probs, dtype=tf.float32, device=self.device) / p_total  # Calculate normalised probabilities #torch -> tf
+    states, next_states, = tf.stack(states), tf.stack(next_states)
+    actions, returns, nonterminals = tf.concat(actions), tf.concat(returns), tf.stack(nonterminals)
+    probs = tf.tensor(probs, dtype=tf.float32, device=self.device) / p_total  # Calculate normalised probabilities
     capacity = self.capacity if self.transitions.full else self.transitions.index
     weights = (capacity * probs) ** -self.priority_weight  # Compute importance-sampling weights w
     weights = weights / weights.max()   # Normalise by max importance-sampling weight from batch

@@ -27,12 +27,12 @@ class Env():
   def _get_state(self):
     state = cv2.resize(self.ale.getScreenGrayscale(), (84, 84), interpolation=cv2.INTER_LINEAR)
     state = state.astype(np.float32)
-    return np.divide(state,255) #torch -> tf
+    return np.divide(state,255)
     # cv image - ndarray
 
   def _reset_buffer(self):
     for _ in range(self.window):
-      #self.state_buffer.append(tf.zeros([84, 84])) #torch -> tf
+      #self.state_buffer.append(tf.zeros([84, 84]))
       self.state_buffer.append(np.zeros((84,84),dtype=np.float32))
 
   def reset(self):
@@ -52,12 +52,12 @@ class Env():
     observation = self._get_state()
     self.state_buffer.append(observation)
     self.lives = self.ale.lives()
-    #return tf.stack(list(self.state_buffer), 0) #torch -> tf
+    #return tf.stack(list(self.state_buffer), 0)
     return np.stack(list(self.state_buffer),0)
 
   def step(self, action):
     # Repeat action 4 times, max pool over last 2 frames
-    #frame_buffer = tf.zeros([2, 84, 84]) #torch -> tf
+    #frame_buffer = tf.zeros([2, 84, 84])
     frame_buffer = np.zeros((2,84,84),dtype=np.float32)
     reward, done = 0, False
     for t in range(4):
@@ -79,7 +79,7 @@ class Env():
         done = True 
       self.lives = lives
     # Return state, reward, done
-    return np.stack(list(self.state_buffer), 0), reward, done #torch -> tf
+    return np.stack(list(self.state_buffer), 0), reward, done
 
   # Uses loss of life as terminal signal
   def train(self):

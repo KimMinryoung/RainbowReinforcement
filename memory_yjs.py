@@ -6,7 +6,7 @@ import numpy as np
 
 Transition = namedtuple('Transition', ('timestep', 'state', 'action', 'reward', 'nonterminal'))
 # torch -> tf
-blank_trans = Transition(0, tf.zeros([84, 84], dtype=tf.uint8), None, 0, False) #torch -> tf
+blank_trans = Transition(0, tf.zeros([84, 84], dtype=tf.uint8), None, 0, False)
 
 
 # Segment tree data structure where parent node values are sum/max of children node values
@@ -111,14 +111,19 @@ class ReplayMemory():
     # Retrieve all required transition data (from t - h to t + n)
     transition = self._get_transition(idx)
     # Create un-discretised state and nth next state
-    state = tf.stack([trans.state for trans in transition[:self.history]]).div_(255) #torch -> tf
-    next_state = tf.stack([trans.state for trans in transition[self.n:self.n + self.history]]).div_(255) #torch -> tf
+    state = np.divide(np.stack([trans.state for trans in transition[:self.history]],axis=-1), 255)
+    
+    #print(state.shape)
+    next_state = np.divide(np.stack([trans.state for trans in transition[self.n:self.n + self.history]],axis=-1), 255)
     # Discrete action to be used as index
-    action = tf.tensor([transition[self.history - 1].action], dtype=tf.int64, device=self.device) #torch -> tf
+    #action = tf.tensor([transition[self.history - 1].action], dtype=tf.int64, device=self.device)
+    action = np.asarray([transition[self.history - 1].action], dtype=np.int64)
     # Calculate truncated n-step discounted return R^n = Σ_k=0->n-1 (γ^k)R_t+k+1 (note that invalid nth next states have reward 0)
-    R = tf.tensor([sum(self.discount ** n * transition[self.history + n - 1].reward for n in range(self.n))], dtype=tf.float32, device=self.device) #torch -> tf
+    #R = tf.tensor([sum(self.discount ** n * transition[self.history + n - 1].reward for n in range(self.n))], dtype=tf.float32, device=self.device)
+    R = np.asarray([sum(self.discount ** n * transition[self.history + n - 1].reward for n in range(self.n))], dtype=np.float32)
     # Mask for non-terminal nth next states
-    nonterminal = tf.tensor([transition[self.history + self.n - 1].nonterminal], dtype=tf.float32, device=self.device) #torch -> tf
+    # nonterminal = tf.tensor([transition[self.history + self.n - 1].nonterminal], dtype=tf.float32, device=self.device)
+    nonterminal = np.asarray([transition[self.history + self.n - 1].nonterminal], dtype=np.float32) 
 
     return prob, idx, tree_idx, state, action, R, next_state, nonterminal
 
@@ -127,9 +132,10 @@ class ReplayMemory():
     segment = p_total / batch_size  # Batch size number of segments, based on sum over all probabilities
     batch = [self._get_sample_from_segment(segment, i) for i in range(batch_size)]  # Get batch of valid samples
     probs, idxs, tree_idxs, states, actions, returns, next_states, nonterminals = zip(*batch)
-    states, next_states, = tf.stack(states), tf.stack(next_states) #torch -> tf
-    actions, returns, nonterminals = tf.concat(actions), tf.concat(returns), tf.stack(nonterminals) #torch -> tf
-    probs = tf.tensor(probs, dtype=tf.float32, device=self.device) / p_total  # Calculate normalised probabilities #torch -> tf
+    states, next_states, = np.stack(states), np.stack(next_states)
+    actions, returns, nonterminals = np.concatenate(actions), np.concatenate(returns), np.stack(nonterminals)
+    #probs = tf.tensor(probs, dtype=tf.float32, device=self.device) / p_total  # Calculate normalised probabilities
+    probs = np.asarray(probs, dtype=np.float32)
     capacity = self.capacity if self.transitions.full else self.transitions.index
     weights = (capacity * probs) ** -self.priority_weight  # Compute importance-sampling weights w
     weights = weights / weights.max()   # Normalise by max importance-sampling weight from batch
@@ -158,6 +164,7 @@ class ReplayMemory():
       else:
         state_stack[t] = self.transitions.data[self.current_idx + t - self.history + 1].state
         prev_timestep -= 1
-    state = tf.stack(state_stack, 0).div_(255)  # Agent will turn into batch
+    state = np.divide(np.stack(state_stack, 0), 255)  # Agent will turn into batch
     self.current_idx += 1
     return state
+

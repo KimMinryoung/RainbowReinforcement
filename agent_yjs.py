@@ -87,7 +87,12 @@ class Agent():
 
     # Calculate current state probabilities (online network noise already sampled)
     log_ps = self.forward(self.online_net, states, log=True)  # Log probabilities log p(s_t, ·; θonline)
-    log_ps_a = log_ps[range(self.batch_size), actions]  # log p(s_t, a_t; θonline)
+    print("log_ps.shape: " + str(log_ps.shape))
+    print("actions.shape: " + str(actions.shape))
+    log_ps_a = np.ndarray([self.batch_size, self.atoms],dtype=np.float32)
+    for i in range(self.batch_size):
+      log_ps_a[i] = log_ps[i][actions[i]]
+    #log_ps_a = log_ps[0:, actions]  # log p(s_t, a_t; θonline)
 
     # Calculate nth next state probabilities
     pns = self.forward(self.online_net, next_states)  # Probabilities p(s_t+n, ·; θonline)

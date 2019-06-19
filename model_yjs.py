@@ -67,7 +67,7 @@ class DQN():
         self.action_space = action_space
         self.atoms = args.atoms
 
-        self.inputs = tf.placeholder(tf.float32, [None, 84,84,args.history_length], name="inputs")
+        self.inputs = tf.placeholder(tf.float32, [None,84,84,args.history_length], name="inputs")
         # self.act = tf.placeholder(tf.float32, [None, self.action_size], name="act")
 
         filter1 = tf.Variable(tf.random_normal([8, 8, args.history_length, 32], stddev=0.01))

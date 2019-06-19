@@ -25,11 +25,11 @@ class Env():
 
   def _get_state(self):
     state = cv2.resize(self.ale.getScreenGrayscale(), (84, 84), interpolation=cv2.INTER_LINEAR)
-    return tf.tensor(state, dtype=tf.float32, device=self.device).div_(255) #torch -> tf
+    return tf.tensor(state, dtype=tf.float32, device=self.device).div_(255)
 
   def _reset_buffer(self):
     for _ in range(self.window):
-      self.state_buffer.append(tf.zeros([84, 84], device=self.device)) #torch -> tf
+      self.state_buffer.append(tf.zeros([84, 84], device=self.device))
 
   def reset(self):
     if self.life_termination:
@@ -48,11 +48,11 @@ class Env():
     observation = self._get_state()
     self.state_buffer.append(observation)
     self.lives = self.ale.lives()
-    return tf.stack(list(self.state_buffer), 0) #torch -> tf
+    return tf.stack(list(self.state_buffer), 0)
 
   def step(self, action):
     # Repeat action 4 times, max pool over last 2 frames
-    frame_buffer = tf.zeros([2, 84, 84], device=self.device) #torch -> tf
+    frame_buffer = tf.zeros([2, 84, 84], device=self.device)
     reward, done = 0, False
     for t in range(4):
       reward += self.ale.act(self.actions.get(action))
@@ -73,7 +73,7 @@ class Env():
         done = True 
       self.lives = lives
     # Return state, reward, done
-    return tf.stack(list(self.state_buffer), 0), reward, done #torch -> tf
+    return tf.stack(list(self.state_buffer), 0), reward, done
 
   # Uses loss of life as terminal signal
   def train(self):
