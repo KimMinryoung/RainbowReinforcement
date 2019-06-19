@@ -74,7 +74,8 @@ class Agent():
   # Acts based on single state (no batch)
   def act(self, state):
     #return (self.forward(self.online_net, state.unsqueeze(0)) * self.support).sum(2).argmax(1).item()
-    return (self.forward(self.online_net, state.reshape(1,84,84,4)) * self.support).sum(2).argmax(1).item()
+    #print(np.argmax(tf.math.reduce_sum((self.forward(self.online_net, state.reshape(1,84,84,4)) * self.support), axis=2)))
+    return np.argmax(tf.math.reduce_sum((self.forward(self.online_net, state.reshape(1,84,84,4)) * self.support), axis=2))
 
   # Acts with an ε-greedy policy (used for evaluation only)
   def act_e_greedy(self, state, epsilon=0.001):  # High ε can reduce evaluation scores drastically

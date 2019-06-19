@@ -111,8 +111,8 @@ class ReplayMemory():
     # Retrieve all required transition data (from t - h to t + n)
     transition = self._get_transition(idx)
     # Create un-discretised state and nth next state
-    state = tf.stack([trans.state for trans in transition[:self.history]]).to(dtype=tf.float32, device=self.device).div_(255) #torch -> tf
-    next_state = tf.stack([trans.state for trans in transition[self.n:self.n + self.history]]).to(dtype=tf.float32, device=self.device).div_(255) #torch -> tf
+    state = tf.stack([trans.state for trans in transition[:self.history]]).div_(255) #torch -> tf
+    next_state = tf.stack([trans.state for trans in transition[self.n:self.n + self.history]]).div_(255) #torch -> tf
     # Discrete action to be used as index
     action = tf.tensor([transition[self.history - 1].action], dtype=tf.int64, device=self.device) #torch -> tf
     # Calculate truncated n-step discounted return R^n = Σ_k=0->n-1 (γ^k)R_t+k+1 (note that invalid nth next states have reward 0)
@@ -158,6 +158,6 @@ class ReplayMemory():
       else:
         state_stack[t] = self.transitions.data[self.current_idx + t - self.history + 1].state
         prev_timestep -= 1
-    state = tf.stack(state_stack, 0).to(dtype=tf.float32, device=self.device).div_(255)  # Agent will turn into batch
+    state = tf.stack(state_stack, 0).div_(255)  # Agent will turn into batch
     self.current_idx += 1
     return state
