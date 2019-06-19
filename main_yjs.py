@@ -39,8 +39,8 @@ parser.add_argument('--seed', type=int, default=123, help='Random seed')
 parser.add_argument('--steps-before-train', type=int, default=int(80e3), metavar='STEPS', help='Steps before starting training')    # parser.add_argument('--learn-start', type=int, default=int(80e3), metavar='STEPS', help='Number of steps before starting training')
 parser.add_argument('--target-update', type=int, default=int(32e3), metavar='τ', help='Steps to update target network')
 parser.add_argument('--T-max', type=int, default=int(50e6), metavar='STEPS', help='Maximum training steps (number of frames x 4)')
-parser.add_argument('--V-max', type=float, default=10, metavar='Vmax', help='Maximum of value distribution support')
-parser.add_argument('--V-min', type=float, default=-10, metavar='Vmin', help='Minimum of value distribution support')
+parser.add_argument('--V-max', type=float, default=10.0, metavar='Vmax', help='Maximum of value distribution support')
+parser.add_argument('--V-min', type=float, default=-10.0, metavar='Vmin', help='Minimum of value distribution support')
 
 # Setup
 args = parser.parse_args()

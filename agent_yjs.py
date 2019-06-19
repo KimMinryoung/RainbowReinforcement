@@ -9,7 +9,7 @@ class Agent():
     self.atoms = args.atoms
     self.Vmin = args.V_min
     self.Vmax = args.V_max
-    self.support = tf.linspace(args.V_min, args.V_max, self.atoms).to(device=args.device)  # Support (range) of z
+    self.support = tf.linspace(args.V_min, args.V_max, self.atoms)  # Support (range) of z
     self.delta_z = (args.V_max - args.V_min) / (self.atoms - 1)
     self.batch_size = args.batch_size
     self.n = args.multi_steps
@@ -17,7 +17,6 @@ class Agent():
     self.norm_clip = args.max_norm_clip
     
     self.sess = tf.Session()
-    self.saver = tf.train.Saver()
 
     #self.online_net = DQN(args, self.action_space).to(device=args.device)
     with tf.variable_scope("online_net"):
@@ -46,6 +45,7 @@ class Agent():
     self.update_target_op = tf.group(*update_target_op)
 
     self.optimizer = tf.train.AdamOptimizer(learning_rate = args.learning_rate, epsilon = args.adam_eps)
+    self.saver = tf.train.Saver()
 
   # Resets noisy weights in all linear layers (of online net only)
   def reset_noise(self):

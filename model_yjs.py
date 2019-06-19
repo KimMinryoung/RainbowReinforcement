@@ -10,19 +10,19 @@ class NoisyLinear():
 
         self.input = tf.placeholder(tf.float32, [None, self.in_], name="input")
 
-        self.weight_mu = tf.Variable(tf.zeros([out_, in_]), name="weight_mu")
-        self.weight_sigma = tf.Variable(tf.zeros([out_, in_]), name="weight_sigma")
+        self.weight_mu = tf.Variable(tf.zeros([in_, out_],tf.float32), name="weight_mu")
+        self.weight_sigma = tf.Variable(tf.zeros([in_, out_],tf.float32), name="weight_sigma")
 
-        self.weight_epsilon = tf.constant
+        self.weight_epsilon = tf.constant(0.0,shape=[in_,out_],dtype=tf.float32)
 
-        self.bias_mu = tf.Variable(tf.zeros([out_]), name="bias_mu")
-        self.bias_sigma = tf.Variable(tf.zeros([out_]), name="bias_sigma")
+        self.bias_mu = tf.Variable(tf.zeros([out_],tf.float32), name="bias_mu")
+        self.bias_sigma = tf.Variable(tf.zeros([out_],tf.float32), name="bias_sigma")
 
-        self.bias_epsilon = tf.constant
+        self.bias_epsilon = tf.constant(0.0, shape=[out_],dtype=tf.float32)
 
         self.result = tf.matmul(self.input, self.weight_mu) + self.bias_mu
         self.tr_result = tf.matmul(self.input,
-                                      self.weight_mu + self.weight_sigma * self.weight_epsilon) + self.bias_mu + self.bias_sigma * self.bias_epsilon
+                                      self.weight_mu + self.weight_sigma*self.weight_epsilon) + self.bias_mu + self.bias_sigma * self.bias_epsilon
 
         self.sess = tf.InteractiveSession()
         self.sess.run(tf.initialize_all_variables())
@@ -50,6 +50,7 @@ class NoisyLinear():
         self.bias_epsilon = tf.constant(epsilon_out)
 
     def forward(self, input):
+        
         if self.training:
             self.sess.run(self.tr_result, feed_dict={self.input: input})
             return self.tr_result
@@ -67,24 +68,32 @@ class DQN():
         self.action_space = action_space
         self.atoms = args.atoms
 
-        self.inputs = tf.placeholder(tf.float32, [None, args.history_length * 8 * 32], name="inputs")
+        self.inputs = tf.placeholder(tf.float32, [None, 84,84,args.history_length], name="inputs")
         # self.act = tf.placeholder(tf.float32, [None, self.action_size], name="act")
 
-        self.conv1 = tf.nn.conv2d(input=self.inputs, filter=[8, 8, args.history_length, 32], strides=4, padding='SAME')
+        filter1 = tf.Variable(tf.random_normal([8, 8, args.history_length, 32], stddev=0.01))
+        self.conv1 = tf.nn.conv2d(input=self.inputs, filter=filter1, strides=[1,4,4,1], padding='SAME')
         self.h1 = tf.nn.relu(self.conv1)
-        self.conv2 = tf.nn.conv2d(input=self.h1, filter=[4, 4, 32, 64], strides=2, padding='VALID')
+        filter2 = tf.Variable(tf.random_normal([4,4,32,64], stddev=0.01))
+        self.conv2 = tf.nn.conv2d(input=self.h1, filter=filter2, strides=[1,2,2,1], padding='VALID')
         self.h2 = tf.nn.relu(self.conv2)
-        self.conv3 = tf.nn.conv2d(input=self.h2, filter=[3, 3, 64, 64], strides=1, padding='VALID')
+        filter3 = tf.Variable(tf.random_normal([3,3,64,64], stddev=0.01))
+        self.conv3 = tf.nn.conv2d(input=self.h2, filter=filter3, strides=[1,1,1,1], padding='VALID')
         self.h3 = tf.nn.relu(self.conv3)
 
-        self.fc_h_v = NoisyLinear(self.inputs, args.hidden_size, std_init=args.init_noisy_std)
-        self.fc_h_a = NoisyLinear(self.inputs, args.hidden_size, std_init=args.init_noisy_std)
-        self.h_fc_h_v = tf.nn.relu(self.fc_h_v)
-        self.h_fc_h_a = tf.nn.relu(self.fc_h_a)
-        self.fc_z_v = NoisyLinear(self.h_fc_h_v, self.atoms, std_init=args.init_noisy_std)
-        self.fc_z_a = NoisyLinear(self.h_fc_h_a, action_space * self.atoms, std_init=args.init_noisy_std)
-        self.h_fc_z_v = tf.nn.relu(self.fc_z_v)
-        self.h_fc_z_a = tf.nn.relu(self.fc_z_a)
+        self.fc_h_v = NoisyLinear(3136, args.hidden_size, std_init=args.init_noisy_std)
+        self.r_v = self.fc_h_v.forward(self.h3)
+        self.fc_h_a = NoisyLinear(3136, args.hidden_size, std_init=args.init_noisy_std)
+        self.r_a = self.fc_h_a.forward(self.h3)
+        self.h_fc_h_v = tf.nn.relu(self.r_v)
+        self.h_fc_h_a = tf.nn.relu(self.r_a)
+        
+        self.fc_z_v = NoisyLinear(args.hidden_size, self.atoms, std_init=args.init_noisy_std)
+        self.z_v = self.fc_h_v.forward(self.h_fc_h_v)
+        self.fc_z_a = NoisyLinear(args.hidden_size, action_space * self.atoms, std_init=args.init_noisy_std)
+        self.z_a = self.fc_h_v.forward(self.h_fc_h_a)
+        self.h_fc_z_v = tf.nn.relu(self.z_v)
+        self.h_fc_z_a = tf.nn.relu(self.z_a)
 
         self.q = self.h_fc_h_v + self.h_fc_h_v - tf.reduce_mean(self.h_fc_h_v, axis=1, keep_dims=True)
         self.action = tf.nn.softmax(self.q)
