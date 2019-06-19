@@ -22,7 +22,6 @@ class Agent():
     with tf.variable_scope("online_net"):
       self.online_net = DQN(args, self.action_space)
     
-    self.saver.restore(self.sess, "./models/model.ckpt")
     #if args.model and os.path.isfile(args.model):
     #  self.online_net.load_state_dict(torch.load(args.model, map_location='cpu'))
     self.online_net.train()
@@ -30,10 +29,15 @@ class Agent():
     #self.target_net = DQN(args, self.action_space).to(device=args.device)
     with tf.variable_scope("target_net"):
       self.target_net = DQN(args, self.action_space)
-    self.update_target_net()
     self.target_net.train()
     #for param in self.target_net.parameters():
     #  param.requires_grad = False
+    
+    self.sess.run(tf.global_variables_initializer())
+    
+    self.saver = tf.train.Saver()
+    if tf.gfile.Exists("./models/model.ckpt"):
+      self.saver.restore(self.sess, "./models/model.ckpt")
     
     # make an op for target update
     online_net_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="online_net")
@@ -43,17 +47,33 @@ class Agent():
                                sorted(target_net_func_vars, key=lambda v: v.name)):
         update_target_op.append(var_target.assign(var))
     self.update_target_op = tf.group(*update_target_op)
+    
+    self.update_target_net()
 
     self.optimizer = tf.train.AdamOptimizer(learning_rate = args.learning_rate, epsilon = args.adam_eps)
-    self.saver = tf.train.Saver()
+
 
   # Resets noisy weights in all linear layers (of online net only)
   def reset_noise(self):
-    self.online_net.reset_noise()
+    #self.online_net.reset_noise()
+    self.sess.run(self.online_net.fc_h_v.reset_noise)
+    self.sess.run(self.online_net.fc_h_a.reset_noise)
+    self.sess.run(self.online_net.fc_z_v.reset_noise)
+    self.sess.run(self.online_net.fc_z_a.reset_noise)
 
+
+
+  def forward(self, network, inputs,  log=False):
+    if log:
+      self.sess.run(network.action_log, feed_dict={network.inputs: inputs})
+      return network.action_log
+    else:
+      self.sess.run(network.action, feed_dict={network.inputs: inputs})
+      return network.action
+          
   # Acts based on single state (no batch)
   def act(self, state):
-    return (self.online_net.forward(state.unsqueeze(0)) * self.support).sum(2).argmax(1).item()
+    return (self.forward(self.online_net, state.unsqueeze(0)) * self.support).sum(2).argmax(1).item()
 
   # Acts with an ε-greedy policy (used for evaluation only)
   def act_e_greedy(self, state, epsilon=0.001):  # High ε can reduce evaluation scores drastically
@@ -64,15 +84,15 @@ class Agent():
     idxs, states, actions, returns, next_states, nonterminals, weights = mem.sample(self.batch_size)
 
     # Calculate current state probabilities (online network noise already sampled)
-    log_ps = self.online_net.forward(states, log=True)  # Log probabilities log p(s_t, ·; θonline)
+    log_ps = self.forward(self.online_net, states, log=True)  # Log probabilities log p(s_t, ·; θonline)
     log_ps_a = log_ps[range(self.batch_size), actions]  # log p(s_t, a_t; θonline)
 
     # Calculate nth next state probabilities
-    pns = self.online_net.forward(next_states)  # Probabilities p(s_t+n, ·; θonline)
+    pns = self.forward(self.online_net, next_states)  # Probabilities p(s_t+n, ·; θonline)
     dns = self.support.expand_as(pns) * pns  # Distribution d_t+n = (z, p(s_t+n, ·; θonline))
     argmax_indices_ns = dns.sum(2).argmax(1)  # Perform argmax action selection using online network: argmax_a[(z, p(s_t+n, a; θonline))]
     self.target_net.reset_noise()  # Sample new target net noise
-    pns = self.target_net.forward(next_states)  # Probabilities p(s_t+n, ·; θtarget)
+    pns = self.forward(self.target_net, next_states)  # Probabilities p(s_t+n, ·; θtarget)
     pns_a = pns[range(self.batch_size), argmax_indices_ns]  # Double-Q probabilities p(s_t+n, argmax_a[(z, p(s_t+n, a; θonline))]; θtarget)
 
     # Compute Tz (Bellman operator T applied to z)
@@ -132,7 +152,7 @@ class Agent():
 
   # Evaluates Q-value based on single state (no batch)
   def evaluate_q(self, state):
-    return (self.online_net.forward(state.unsqueeze(0)) * self.support).sum(2).max(1)[0].item()
+    return (self.forward(self.online_net, state.unsqueeze(0)) * self.support).sum(2).max(1)[0].item()
 
   def train(self):
     self.online_net.train()
