@@ -2,6 +2,7 @@ import os
 import plotly
 from plotly.graph_objs import Scatter, Line
 import tensorflow as tf
+import numpy as np
 
 from env_yjs import Env
 
@@ -12,19 +13,23 @@ Ts, rewards, Qs, best_avg_reward = [], [], [], -1e10
 def plot_line(xs, ys_pop, title, path=''):
   color_a, color_b, color_c = 'rgb(0, 132, 180)', 'rgb(0, 172, 237)', 'rgba(29, 202, 255, 0.2)'
 
-  ys = tf.constant(ys_pop, dtype=tf.float32)
-  ys_max, ys_mean, ys_min, ys_std = ys.max(1)[0].squeeze(), ys.mean(1).squeeze(), ys.min(1)[0].squeeze(), ys.std(1).squeeze()
+  ys = np.asarray(ys_pop, dtype=np.float32)
+  #ys_max, ys_mean, ys_min, ys_std = ys.max(1)[0].squeeze(), ys.mean(1).squeeze(), ys.min(1)[0].squeeze(), ys.std(1).squeeze()
+  ys_max = ys.max(axis=1)
+  ys_mean = ys.mean(axis=1)
+  ys_min = ys.min(axis=1)
+  ys_std = ys.std(axis=1)
   ys_upper, ys_lower = (ys_mean + ys_std), (ys_mean - ys_std)
 
-  trace_max = Scatter(x=xs, y=ys_max.numpy(), line=Line(color=color_a, dash='dash'), name='Max')
-  trace_upper = Scatter(x=xs, y=ys_upper.numpy(), line=Line(color='lightblue'), name='Mean + STD', showlegend=False)
-  trace_mean = Scatter(x=xs, y=ys_mean.numpy(), fill='tonexty', fillcolor=color_c, line=Line(color=color_b), name='Mean')
-  trace_lower = Scatter(x=xs, y=ys_lower.numpy(), fill='tonexty', fillcolor=color_c, line=Line(color='lightpink'), name='Mean - STD', showlegend=False)
-  trace_min = Scatter(x=xs, y=ys_min.numpy(), line=Line(color=color_a, dash='dash'), name='Min')
+  trace_max = Scatter(x=xs, y=ys_max, line=Line(color=color_a, dash='dash'), name='Max')
+  trace_upper = Scatter(x=xs, y=ys_upper, line=Line(color='lightblue'), name='Mean + STD', showlegend=False)
+  trace_mean = Scatter(x=xs, y=ys_mean, fill='tonexty', fillcolor=color_c, line=Line(color=color_b), name='Mean')
+  trace_lower = Scatter(x=xs, y=ys_lower, fill='tonexty', fillcolor=color_c, line=Line(color='lightpink'), name='Mean - STD', showlegend=False)
+  trace_min = Scatter(x=xs, y=ys_min, line=Line(color=color_a, dash='dash'), name='Min')
 
   plotly.offline.plot({
     'data' : [trace_upper, trace_mean, trace_lower, trace_min, trace_max],
-    'layout' : dict(title=title, xaxis={'Title' : 'Step'}, yaxis={'Title' : title})
+    'layout' : dict(title=title, xaxis={'title' : 'Step'}, yaxis={'title' : title})
   }, filename=os.path.join(path, title + '.html'), auto_open=False)
 
 # Test DQN

@@ -59,9 +59,6 @@ class NoisyLinear():
 
 
 class DQN():
-    """DQNetwork with C51, Duelling, and NoisyNetwork
-
-    """
 
     def __init__(self, args, action_space):
         self.action_space = action_space
@@ -117,3 +114,9 @@ class DQN():
         self.fc_h_a.training = False
         self.fc_z_v.training = False
         self.fc_z_a.training = False
+        
+    def reset_noise(self):
+        self.fc_h_v.reset_noise
+        self.fc_h_a.reset_noise
+        self.fc_z_v.reset_noise
+        self.fc_z_a.reset_noise
