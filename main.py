@@ -21,7 +21,6 @@ parser.add_argument('--adam-eps', type=float, default=1.5e-4, metavar='ε', help
 parser.add_argument('--atoms', type=int, default=51, metavar='SIZE', help='Discretized size of value distribution')
 parser.add_argument('--V-min', type=float, default=-10.0, metavar='Vmin', help='Minimum of value distribution support')
 parser.add_argument('--V-max', type=float, default=10.0, metavar='Vmax', help='Maximum of value distribution support')
-#parser.add_argument('--model-path', type=str, metavar='PARAMS', help='Path of saved model')
 parser.add_argument('--memory-capacity', type=int, default=int(1e6), metavar='CAP', help='Capacity of experience replay memory')
 parser.add_argument('--replay-frequency', type=int, default=4, metavar='Fs', help='Frequency of sampling from memory')
 parser.add_argument('--priority-exponent', type=float, default=0.5, metavar='ω', help='Prioritized experience replay exponent')

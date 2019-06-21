@@ -92,17 +92,6 @@ class Agent():
 
     loss = -np.sum(m * log_ps_a, 1)
     loss = weights * loss
-    
-    #tvars = tf.trainable_variables()
-    #grads, _ = tf.clip_by_norm(tvars, self.norm_clip)
-    #train = self.optimizer.apply_gradients(zip(grads, tvars))
-    
-    #train = self.optimizer.minimize(loss)
-    #self.sess.run(train)
-    
-    #tf.clip_by_norm(self.online_net.parameters(), self.norm_clip)
-
-    #mem.update_priorities(idxs, loss.detach())
 
   def update_target_net(self):
     self.sess.run(self.update_target_op)
