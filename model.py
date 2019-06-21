@@ -1,128 +1,103 @@
 import math
-import torch
-from torch import nn
-from torch.nn import functional as F
+import tensorflow as tf
 
 
-# Factorised NoisyLinear layer with bias
-class NoisyLinear(nn.Module):
-    """NosiyLinear called Nosiy Networks has been studied in DeepMind.
-
-    A deep reinforcement learning agent with parametric noise added to its weights,
-    and show that th induced stochasticity of the agent's policy can be used to aid efficient exploration.
-
-    """
-    def __init__(self, in_features, out_features, std_init=0.5):
-        """This module extends torch.nn.Linear
-        Args:
-            in_features: the number of input feature
-            out_features: the number of output feature
-            std_init: parameter for NoisyLinear
-        """
-        super(NoisyLinear, self).__init__()
-        self.in_features = in_features
-        self.out_features = out_features
+class NoisyLinear():
+    def __init__(self, conv_out, in_, out_, std_init=0.5, training=True):
+        self.in_ = in_
+        self.out_ = out_
         self.std_init = std_init
-        self.weight_mu = nn.Parameter(torch.empty(out_features, in_features))
-        self.weight_sigma = nn.Parameter(torch.empty(out_features, in_features))
-        self.register_buffer('weight_epsilon', torch.empty(out_features, in_features))
-        self.bias_mu = nn.Parameter(torch.empty(out_features))
-        self.bias_sigma = nn.Parameter(torch.empty(out_features))
-        self.register_buffer('bias_epsilon', torch.empty(out_features))
-        self.reset_parameters()
-        self.reset_noise()
 
-    def reset_parameters(self):
-        """This method for reset layer parameter.
+        self.input = conv_out 
+        self.weight_mu = tf.Variable(tf.zeros([in_, out_],tf.float32), name="weight_mu")
+        self.weight_sigma = tf.Variable(tf.zeros([in_, out_],tf.float32), name="weight_sigma")
 
-        Notes:
-            For factorised noisy networks, each element mu_i,j was initialised by a sample
-            from an independent uniform distribuntions MU[-1/root(p),+1/root(p)] and
-            each element sigma_i,j was initialised to a contant sigma_0/root(p).
-            in paper, hyperparameter sigma_0 is set to 0.5
-                std_init=0.5
+        self.weight_epsilon = tf.constant(0.0,shape=[in_,out_],dtype=tf.float32)
 
-        """
-        mu_range = 1 / math.sqrt(self.in_features)
-        self.weight_mu.data.uniform_(-mu_range, mu_range)
-        self.weight_sigma.data.fill_(self.std_init / math.sqrt(self.in_features))
-        self.bias_mu.data.uniform_(-mu_range, mu_range)
-        self.bias_sigma.data.fill_(self.std_init / math.sqrt(self.out_features))
+        self.bias_mu = tf.Variable(tf.zeros([out_],tf.float32), name="bias_mu")
+        self.bias_sigma = tf.Variable(tf.zeros([out_],tf.float32), name="bias_sigma")
+
+        self.bias_epsilon = tf.constant(0.0, shape=[out_],dtype=tf.float32)
+
+        self.result = tf.matmul(self.input, self.weight_mu) + self.bias_mu
+        self.tr_result = tf.matmul(self.input,
+                                      self.weight_mu + self.weight_sigma*self.weight_epsilon) + self.bias_mu + self.bias_sigma * self.bias_epsilon
+
+        self.training = training
+
+    def reset_variables(self):
+        mu_range = 1 / math.sqrt(self.in_)
+
+        self.weight_mu = tf.random_uniform([self.in_, self.out_], minval=-mu_range, maxval=mu_range, dtype=tf.float32)
+        self.weight_sigma = tf.fill([self.in_, self.out_], self.std_init / math.sqrt(self.in_))
+
+        self.bias_mu = tf.random_uniform([self.out_], minval=-mu_range, maxval=mu_range, dtype=tf.float32)
+        self.weight_sigma = tf.fill([self.out_], self.std_init / math.sqrt(self.in_))
 
     def _scale_noise(self, size):
-        """This method for scale noise by the number of input/output features.
-
-        Args:
-            size: size is int for setting scale
-
-        Returns:
-            scaled noise
-
-        """
-        x = torch.randn(size)
-        return x.sign().mul_(x.abs().sqrt_())
+        self.x = tf.random.uniform([size])
+        return tf.abs(self.x) * (tf.sqrt(tf.abs(self.x)))
 
     def reset_noise(self):
-        """This method make initialized noise.
+        epsilon_in = self._scale_noise(self.in_)
+        epsilon_out = self._scale_noise(self.out_)
 
-        The Noise depends on the number of input/output featuers.
+        self.weight_epsilon = tf.constant(tf.tensordot(epsilon_out, epsilon_in, axes=0))
+        self.bias_epsilon = tf.constant(epsilon_out)
 
-        """
-        epsilon_in = self._scale_noise(self.in_features)
-        epsilon_out = self._scale_noise(self.out_features)
-        self.weight_epsilon.copy_(epsilon_out.ger(epsilon_in))
-        self.bias_epsilon.copy_(epsilon_out)
+class DQN():
 
-    def forward(self, input):
-        """This method is override nn.Linear's forward
-
-        Args:
-            input: Input data
-
-        Returns:
-            Return is nn.Linear's output. but use noisy parameter.
-
-        """
-        if self.training:
-            return F.linear(input, self.weight_mu + self.weight_sigma * self.weight_epsilon,
-                            self.bias_mu + self.bias_sigma * self.bias_epsilon)
-        else:
-            return F.linear(input, self.weight_mu, self.bias_mu)
-
-
-class DQN(nn.Module):
-    """This is DQN where 'C51', 'Duelling', 'NoisyNetwork'
-    
-    """
     def __init__(self, args, action_space):
-        super().__init__()
-        self.atoms = args.atoms
         self.action_space = action_space
+        self.atoms = args.atoms
 
-        self.conv1 = nn.Conv2d(args.history_length, 32, 8, stride=4, padding=1)
-        self.conv2 = nn.Conv2d(32, 64, 4, stride=2)
-        self.conv3 = nn.Conv2d(64, 64, 3)
-        self.fc_h_v = NoisyLinear(3136, args.hidden_size, std_init=args.noisy_std)
-        self.fc_h_a = NoisyLinear(3136, args.hidden_size, std_init=args.noisy_std)
-        self.fc_z_v = NoisyLinear(args.hidden_size, self.atoms, std_init=args.noisy_std)
-        self.fc_z_a = NoisyLinear(args.hidden_size, action_space * self.atoms, std_init=args.noisy_std)
+        self.inputs = tf.placeholder(tf.float32, [None,84,84,args.history_length], name="inputs")
 
-    def forward(self, x, log=False):
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
-        x = x.view(-1, 3136)
-        v = self.fc_z_v(F.relu(self.fc_h_v(x)))  # Value stream
-        a = self.fc_z_a(F.relu(self.fc_h_a(x)))  # Advantage stream
-        v, a = v.view(-1, 1, self.atoms), a.view(-1, self.action_space, self.atoms)
-        q = v + a - a.mean(1, keepdim=True)  # Combine streams
-        if log:  # Use log softmax for numerical stability
-            q = F.log_softmax(q, dim=2)  # Log probabilities with action over second dimension
-        else:
-            q = F.softmax(q, dim=2)  # Probabilities with action over second dimension
-        return q
+        filter1 = tf.Variable(tf.random_normal([8, 8, args.history_length, 32], stddev=0.01))
+        self.conv1 = tf.nn.conv2d(input=self.inputs, filter=filter1, strides=[1,4,4,1], padding='SAME')
+        self.h1 = tf.nn.relu(self.conv1)
+        filter2 = tf.Variable(tf.random_normal([4,4,32,64], stddev=0.01))
+        self.conv2 = tf.nn.conv2d(input=self.h1, filter=filter2, strides=[1,2,2,1], padding='VALID')
+        self.h2 = tf.nn.relu(self.conv2)
+        filter3 = tf.Variable(tf.random_normal([3,3,64,64], stddev=0.01))
+        self.conv3 = tf.nn.conv2d(input=self.h2, filter=filter3, strides=[1,1,1,1], padding='VALID')
+        self.h3 = tf.nn.relu(self.conv3)
 
+        self.fc_h_v = NoisyLinear(tf.reshape(self.h3,[-1,3136]), 3136, args.hidden_size, std_init=args.init_noisy_std)
+        self.r_v = self.fc_h_v.tr_result
+        self.fc_h_a = NoisyLinear(tf.reshape(self.h3,[-1,3136]), 3136, args.hidden_size, std_init=args.init_noisy_std)
+        self.r_a = self.fc_h_a.tr_result
+        self.h_fc_h_v = tf.nn.relu(self.r_v)
+        self.h_fc_h_a = tf.nn.relu(self.r_a)
+        
+        self.fc_z_v = NoisyLinear(self.h_fc_h_v, args.hidden_size, self.atoms, std_init=args.init_noisy_std)
+        self.z_v = self.fc_z_v.tr_result
+        self.fc_z_a = NoisyLinear(self.h_fc_h_a, args.hidden_size, action_space * self.atoms, std_init=args.init_noisy_std)
+        self.z_a = self.fc_z_a.tr_result
+        self.h_fc_z_v = tf.nn.relu(self.z_v)
+        self.h_fc_z_a = tf.nn.relu(self.z_a)
+        
+        self.v = tf.reshape(self.h_fc_z_v,[-1,1,self.atoms])
+        self.a = tf.reshape(self.h_fc_z_a,[-1,self.action_space,self.atoms])
+        
+        self.q = self.v + self.a - tf.reduce_mean(self.a,axis=1,keep_dims=True)
+        self.action = tf.nn.softmax(self.q)
+        self.action_log = tf.nn.log_softmax(self.q)
+        
+    def train(self):
+        self.fc_h_v.training = True
+        self.fc_h_a.training = True
+        self.fc_z_v.training = True
+        self.fc_z_a.training = True
+        
+    def eval(self):
+        self.fc_h_v.training = False
+        self.fc_h_a.training = False
+        self.fc_z_v.training = False
+        self.fc_z_a.training = False
+        
     def reset_noise(self):
-        for name, module in self.named_children():
-            if 'fc' in name:
-                module.reset_noise()
+        self.fc_h_v.reset_noise
+        self.fc_h_a.reset_noise
+        self.fc_z_v.reset_noise
+        self.fc_z_a.reset_noise
